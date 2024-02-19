@@ -13,6 +13,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This is a brief tutorial relating to ggplot and how to add annotations and text to a chart to help explain the visualization
 
+We will be using A&E Admissions data, specifically the 4 Hour and 12 Hour Breaches variables
+
+A breach occurs when a patient remains in A&E without being discharged or admitted for 4 hours, and then a second breach occurs if they remain in A&E for over 12 hours.
+
 First we need to load in the required packages
 
 
@@ -28,16 +32,19 @@ library(ggplot2)
 
 ## Loading in the data
 
-We need to source where our data is coming from, the below URL is from the NHS England Website and relates to the publicly available A&E Data
+We need to source where our data is coming from, the below URL is from the NHS England Website and relates to the publicly available A&E data from August-2010 to September-2023
+
+Save a copy into your project folder and then read it into R
 
 We also need to tell R what part of the workbook we wish to use for our analysis, and define the column types
 
 ```{r}
+# We define the URL first from the website
 data_url <- 'https://view.officeapps.live.com/op/view.aspx?src=https%3A%2F%2Fwww.england.nhs.uk%2Fstatistics%2Fwp-content%2Fuploads%2Fsites%2F2%2F2023%2F10%2FMonthly-AE-Time-Series-September-2023.xls&wdOrigin=BROWSELINK'
 
-download.file(url = data_url, destfile = here('data', 'Monthly-AE-Time-Series-September-2023.xlsx'), mode = 'wb')
 
-Monthly_Data <- read_excel(here("Monthly-AE-Time-Series-September-2023.xls"), sheet = 1, range = "B14:N172",
+# Then we load that data into R with 'read_excel' and tell it what part of the workbook we want
+Monthly_Data <- read_excel(path = here('Monthly-AE-Time-Series-September-2023.xlsx'), sheet = 1, range = "B14:N172",
   col_names = TRUE,
   col_types = c("date","numeric","numeric","numeric",
               "numeric","numeric","numeric", "numeric",
@@ -48,49 +55,52 @@ Monthly_Data <- read_excel(here("Monthly-AE-Time-Series-September-2023.xls"), sh
 
 ## Formatting the columns
 
-Next we need to format our columns and select the ones we wish to use
+Next we need to format our columns and select the ones we want to use
 
 When you import data into R the date variables are defined as POSIX date, so we can format them into standard R date format
 
 ```{r formatted variables}
 Monthly_Data_Formatted <- Monthly_Data |>
-  # Formatting variables to integers and renaming to make them more manageable
+# Formatting variables to integers and renaming to make them more manageable
   mutate(
     `Total Attendances` = as.integer(total_attendances),
     `Total Emergency Admissions` = as.integer(total_emergency_admissions),
-    `4 Hour Admissions` = as.integer(number_of_patients_spending_4_hours_from_decision_to_admit_to_admission),
-    `12 Hour Admissions` = as.integer(number_of_patients_spending_12_hours_from_decision_to_admit_to_admission),
+    `4 Hour Breaches` = as.integer(number_of_patients_spending_4_hours_from_decision_to_admit_to_admission),
+    `12 Hour Breaches` = as.integer(number_of_patients_spending_12_hours_from_decision_to_admit_to_admission),
     `Period Formatted` = as.Date(period),
+# We're creating a 'Year' variable based off of the 'Period Formatted' variable we made above
     `Year` = year(`Period Formatted`)) |>
-  # Keeping the formatted columns
+# Keeping the formatted columns
   select(`Period Formatted`,
          `Year`,
          `Total Attendances`, 
          `Total Emergency Admissions`, 
-         `4 Hour Admissions`, 
-         `12 Hour Admissions`) |>
+         `4 Hour Breaches`, 
+         `12 Hour Breaches`) |>
   view()
 ```
 
 ## Overview Table
 
 It's useful to create an initial table to get an idea of the overall trends
-We can group by the Year variable to get aggregate counts
+
+We can group by the new 'Year' variable to get aggregate counts
 
 ```{r summary table}
 Yearly_Table <- Monthly_Data_Formatted |>
   group_by(`Year`) |>
   summarise(
     `Total Emergency Admissions` = sum(`Total Emergency Admissions`),
-    `4 Hour Admissions` = sum(`4 Hour Admissions`),
-    `12 Hour Admissions` = sum(`12 Hour Admissions`)
+    `4 Hour Breaches` = sum(`4 Hour Breaches`),
+    `12 Hour Breaches` = sum(`12 Hour Breaches`)
   ) |>
   gt() |>
   tab_header(title = md("**Total A&E Breaches in England 2010-2023**"),
              subtitle = md("Both 4-Hour and 12-Hour Breaches")) |>
   tab_source_note(source_note = "Source: NHS England A&E Monthly Statistics") |>
-  fmt_number(columns = c(`Year`, `Total Emergency Admissions`,`4 Hour Admissions`, `12 Hour Admissions`),
-             sep_mark = "",
+# This part formas the selected columns by choosing the delimiter and number of decimals
+  fmt_number(columns = c(`Total Emergency Admissions`,`4 Hour Breaches`, `12 Hour Breaches`),
+             sep_mark = ",",
              decimals = 0)
 
 Yearly_Table
@@ -98,7 +108,13 @@ Yearly_Table
 
 ## A simple plot with title labels
 
-This is a simple plot showing total emergency admissions
+Now we have an idea of the trends we can start visualising
+
+This will be a simple line plot showing total emergency admissions
+
+We define our data we want to use for the graph, and then define our x and y axes
+
+We can also include a title and axis labels
 
 ```{r simple plot}
 Simple_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, y = `Total Emergency Admissions`)) +
@@ -106,12 +122,14 @@ Simple_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, y = `T
   labs(title = "Total A&E Admissions in England",
        subtitle = "For 2010-2023",
        x = "Date",
-       y = "Total A&E Admissions")
+       y = "Number of Breaches")
 Simple_Plot
 
 ```
 
 ## Applying a scale to the x axis
+
+As you can see this graph is very basic, so lets start improving it
 
 Currently the x axis is only showing 3 years, we can change this by adding a scale
 
@@ -122,6 +140,7 @@ Simple_Plot_Dates <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, 
        subtitle = "For 2010-2023",
        x = "Date",
        y = "Total A&E Admissions") +
+# We can simply add our scale onto the graph by including the 'scale_x_date' condition 
   scale_x_date(date_labels = "%Y", date_breaks = "1 year")
 
 Simple_Plot_Dates
@@ -129,23 +148,25 @@ Simple_Plot_Dates
 
 ## Creating initial breaches plot
 
-Now we can swap out the admissions variable for the breaches and add some colour to distinguish them
+Now we know how to plot a line we swap out the Total Admissions for our 4 and 12 Hour Admissions and add some colour to distinguish the two lines
 
 ```{r simple breaches plot}
-Simple_Breaches_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, y = `4 Hour Admissions`)) +
-  geom_line(colour = "red", size = 1) +
-  geom_line(aes(x = `Period Formatted`, y = `12 Hour Admissions`), colour = "purple", size = 1) +
+Simple_Breaches_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, y = `4 Hour Breaches`)) +
+# This first geom_line represents the 4 Hour line we detailed in the ggplot condition
+  geom_line(colour = "red", size = 0.5) +
+# Then to add a second line we simpply add another geom_line condition and specify the variables
+  geom_line(aes(x = `Period Formatted`, y = `12 Hour Breaches`), colour = "purple", size = 0.5) +
   labs(title = "Total A&E Breaches in England",
        subtitle = "For 2010-2023",
        x = "Date",
-       y = "Total A&E Breaches") +
+       y = "Number of Breaches") +
   scale_x_date(date_labels = "%Y", date_breaks = "1 year")
 
 Simple_Breaches_Plot
 ```
 ## Adding annotations
 
-We can now add some annotations to help visualize this plot better
+We can now add some annotations to help visualise this plot better
 
 We can highlight the COVID period with a rectangle zone, so we need to know a few details about the pandemic:
 
@@ -156,16 +177,18 @@ It spread throughout the UK and in July 2021 the delta variant began spreading
 So we can define the COVID period as being roughly from January 2020 to December 2021
 
 ```{r annotate function}
-Annotated_Breaches_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, y = `4 Hour Admissions`)) +
-  geom_line(colour = "red", size = 1) +
-  geom_line(aes(x = `Period Formatted`, y = `12 Hour Admissions`), colour = "purple", size = 1) +
-  labs(title = "Total A&E Breaches",
+Annotated_Breaches_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, y = `4 Hour Breaches`)) +
+  geom_line(colour = "red", size = 0.5) +
+  geom_line(aes(x = `Period Formatted`, y = `12 Hour Breaches`), colour = "purple", size = 0.5) +
+  labs(title = "Total A&E Breaches in England",
        subtitle = "For 2010-2023",
        x = "Date",
-       y = "Total A&E Breaches") +
-  scale_x_date(date_labels = "%Y", date_breaks = "1 year")+
+       y = "Number of Breaches") +
+  scale_x_date(date_labels = "%Y", date_breaks = "1 year") +
+# The 'annotate' condition is used to place a rectangle on the graph, the x asis defines the width and the y defines the height
   annotate('rect', xmin = as.Date("2020-01-01"), xmax = as.Date("2021-12-31"), ymin = 0, ymax = 130000,
            alpha = 0.1, fill = "blue", col = "black") +
+# Here we add some text to the graph to indicate what the rectangle is showing us
   annotate('text', x = as.Date("2018-08-01"), y = 130000, label = "COVID Period")
 
 Annotated_Breaches_Plot
@@ -175,17 +198,18 @@ Annotated_Breaches_Plot
 Lets add an arrow to the label to make it clearer
 
 ```{r adding arrow}
-Arrow_Breaches_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, y = `4 Hour Admissions`)) +
-  geom_line(colour = "red", size = 1) +
-  geom_line(aes(x = `Period Formatted`, y = `12 Hour Admissions`), colour = "purple", size = 1) +
-  labs(title = "Total A&E Breaches",
+Arrow_Breaches_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, y = `4 Hour Breaches`)) +
+  geom_line(colour = "red", size = 0.5) +
+  geom_line(aes(x = `Period Formatted`, y = `12 Hour Breaches`), colour = "purple", size = 0.5) +
+  labs(title = "Total A&E Breaches in England",
        subtitle = "For 2010-2023",
        x = "Date",
-       y = "Total A&E Breaches") +
+       y = "Number of A&E Breaches") +
   scale_x_date(date_labels = "%Y", date_breaks = "1 year")+
   annotate('rect', xmin = as.Date("2020-01-01"), xmax = as.Date("2021-12-31"), ymin = 0, ymax = 130000,
            alpha = 0.1, fill = "blue", col = "black") +
   annotate('text', x = as.Date("2018-08-01"), y = 130000, label = "COVID Period") + 
+# We use 'annotate' again and using the same syntax as the box we now define the arrow's curve and length
    annotate('curve', x = as.Date("2018-10-01"), xend = as.Date("2019-12-01"),
             y = 125000, yend = 110000, linewidth = 0.5, curvature = 0.5,
              arrow = arrow(length = unit(0.4,'cm')))
@@ -206,40 +230,168 @@ https://www.gov.uk/government/publications/covid-19-and-occupational-impacts/cov
 - Most restrictions removed July 2021
 
 ```{r adding lines}
-Line_Breaches_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, y = `4 Hour Admissions`)) +
-  geom_line(colour = "red", size = 1) +
-  geom_line(aes(x = `Period Formatted`, y = `12 Hour Admissions`), colour = "purple", size = 1) +
-  labs(title = "Total A&E Breaches",
+Line_Breaches_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, y = `4 Hour Breaches`)) +
+  geom_line(colour = "red", size = 0.5) +
+  geom_line(aes(x = `Period Formatted`, y = `12 Hour Breaches`), colour = "purple", size = 0.5) +
+  labs(title = "Total A&E Breaches in England",
        subtitle = "For 2010-2023",
        x = "Date",
-       y = "Total A&E Breaches") +
+       y = "Number of A&E Breaches") +
   scale_x_date(date_labels = "%Y", date_breaks = "1 year")+
   annotate('rect', xmin = as.Date("2020-01-01"), xmax = as.Date("2021-12-31"), ymin = 0, ymax = 130000,
            alpha = 0.1, fill = "blue", col = "black") +
   annotate('text', x = as.Date("2018-08-01"), y = 130000, label = "COVID Period") + 
+# We use 'annotate' again and using the same syntax as the box we now define the arrow's curve and length
    annotate('curve', x = as.Date("2018-10-01"), xend = as.Date("2019-12-01"),
             y = 125000, yend = 110000, linewidth = 0.5, curvature = 0.5,
              arrow = arrow(length = unit(0.4,'cm'))) +
-  # Below is the code for adding the vertical lines
+# Below is the code for adding the vertical lines, again using the axes to determine their positions
   geom_segment(aes(x = as.Date("2020-03-01"), y = 0, yend = 150000,
                      xend = as.Date("2020-03-01"), colour = "segment"),
-                     linewidth = 1, colour="green") +
+                     linewidth = 0.5, colour="green") +
   geom_segment(aes(x = as.Date("2020-11-01"), y = 0, yend = 150000,
                      xend = as.Date("2020-11-01"), colour = "segment"),
-                     linewidth = 1, colour="green") +
+                     linewidth = 0.5, colour="green") +
   geom_segment(aes(x = as.Date("2021-01-01"), y = 0, yend = 150000,
                      xend = as.Date("2021-01-01"), colour = "segment"),
-                     linewidth = 1, colour="green") +
+                     linewidth = 0.5, colour="green") +
+# Here we add labels to distinguish the lines
   annotate('text',x = as.Date("2018-05-01"),y = 160000,label = "First lockdown") +
     annotate('text',x = as.Date("2020-03-01"),y = 180000,label = "Second lockdown") +
     annotate('text',x = as.Date("2021-09-01"),y = 165000,label = "Third lockdown") +
-  # Adding arrows
+# And now add the arrows to make it clear which is which
    annotate('curve',x = as.Date("2019-01-01"),xend = as.Date("2020-03-01"), y = 155000, yend = 140000 ,
-    linewidth = 1,curvature = 0.6,arrow = arrow(length = unit(0.2,'cm'))) +
+    linewidth = 0.5,curvature = 0.6,arrow = arrow(length = unit(0.2,'cm'))) +
      annotate('curve',x = as.Date("2020-02-01"),xend = as.Date("2020-11-01"), y = 175000, yend = 150000,
-    linewidth = 1,curvature = 0.6,arrow = arrow(length = unit(0.2,'cm'))) +
+    linewidth = 0.5,curvature = 0.6,arrow = arrow(length = unit(0.2,'cm'))) +
    annotate('curve',x = as.Date("2021-10-01"),xend = as.Date("2021-01-01"), y = 155000 , yend = 140000,
-    linewidth = 1,curvature = 0.6,arrow = arrow(length = unit(0.2,'cm'))) 
+    linewidth = 0.5,curvature = 0.6,arrow = arrow(length = unit(0.2,'cm'))) 
 
 Line_Breaches_Plot
+```
+
+## Adding a theme to the plot
+
+Now that we have our visualisation the final step is to make it more presentable by adding a theme
+
+We also want to add a legend so we need to prepare the plot for that
+
+First create a COLOURS object that sorts what the colours in the legend denote
+
+Then we move the colour argument inside the aes() in order to provide a legend to the plot
+
+Then we add a 'scale_colour_manual' argument into the plot, giving it the values and the name of the legend we want
+
+
+``` {r adding theme}
+# Creating our colours object
+COLOURS <- c("4 Hour" = "red", "12 Hour" = "purple")
+
+Themed_Breaches_Plot <- ggplot(Monthly_Data_Formatted) +
+# We replace the colours in the aes() argument with their new names above
+  geom_line(aes(x = `Period Formatted`, y = `4 Hour Breaches`, colour = "4 Hour"), size = 0.5) +
+  geom_line(aes(x = `Period Formatted`, y = `12 Hour Breaches`, colour = "12 Hour"), size = 0.5) +
+# Add the scale_colour_manual argument here 
+  scale_color_manual(values = COLOURS, name = "Type of Breach") +
+  labs(title = "Total A&E Breaches in England",
+       subtitle = "For 2010-2023",
+       x = "Date",
+       y = "Number of A&E Breaches") +
+  scale_x_date(date_labels = "%Y", date_breaks = "1 year")+
+  annotate('rect', xmin = as.Date("2020-01-01"), xmax = as.Date("2021-12-31"), ymin = 0, ymax = 130000,
+           alpha = 0.1, fill = "blue", col = "black") +
+  annotate('text', x = as.Date("2018-08-01"), y = 130000, label = "COVID Period") + 
+# We use 'annotate' again and using the same syntax as the box we now define the arrow's curve and length
+   annotate('curve', x = as.Date("2018-10-01"), xend = as.Date("2019-12-01"),
+            y = 125000, yend = 110000, linewidth = 0.5, curvature = 0.5,
+             arrow = arrow(length = unit(0.4,'cm'))) +
+# Below is the code for adding the vertical lines, again using the axes to determine their positions
+  geom_segment(aes(x = as.Date("2020-03-01"), y = 0, yend = 150000,
+                     xend = as.Date("2020-03-01"), colour = "segment"),
+                     linewidth = 0.5, colour="green") +
+  geom_segment(aes(x = as.Date("2020-11-01"), y = 0, yend = 150000,
+                     xend = as.Date("2020-11-01"), colour = "segment"),
+                     linewidth = 0.5, colour="green") +
+  geom_segment(aes(x = as.Date("2021-01-01"), y = 0, yend = 150000,
+                     xend = as.Date("2021-01-01"), colour = "segment"),
+                     linewidth = 0.5, colour="green") +
+# Here we add labels to distinguish the lines
+  annotate('text',x = as.Date("2018-05-01"),y = 160000,label = "First lockdown") +
+    annotate('text',x = as.Date("2020-03-01"),y = 180000,label = "Second lockdown") +
+    annotate('text',x = as.Date("2021-09-01"),y = 165000,label = "Third lockdown") +
+# And now add the arrows to make it clear which is which
+   annotate('curve',x = as.Date("2019-01-01"),xend = as.Date("2020-03-01"), y = 155000, yend = 140000 ,
+    linewidth = 0.5,curvature = 0.6,arrow = arrow(length = unit(0.2,'cm'))) +
+     annotate('curve',x = as.Date("2020-02-01"),xend = as.Date("2020-11-01"), y = 175000, yend = 150000,
+    linewidth = 0.5,curvature = 0.6,arrow = arrow(length = unit(0.2,'cm'))) +
+   annotate('curve',x = as.Date("2021-10-01"),xend = as.Date("2021-01-01"), y = 155000 , yend = 140000,
+    linewidth = 0.5,curvature = 0.6,arrow = arrow(length = unit(0.2,'cm'))) +
+# We can start by adding a type of theme here, in this case 'light'
+  theme_light() 
+  
+
+Themed_Breaches_Plot
+```
+
+## Adding a legend to the plot
+
+Now to clean up the legend and add some more details to the theme and we should have our final plot 
+
+``` {r adding legend}
+# Creating our colours object
+COLOURS <- c("4 Hour" = "red", "12 Hour" = "purple")
+
+Legend_Breaches_Plot <- ggplot(Monthly_Data_Formatted) +
+# We replace the colours in the aes() argument with their new names above
+  geom_line(aes(x = `Period Formatted`, y = `4 Hour Breaches`, colour = "4 Hour"), size = 0.5) +
+  geom_line(aes(x = `Period Formatted`, y = `12 Hour Breaches`, colour = "12 Hour"), size = 0.5) +
+# Add the scale_colour_manual argument here 
+  scale_color_manual(values = COLOURS, name = "Type of Breach") +
+  labs(title = "Total A&E Breaches in England",
+       subtitle = "For 2010-2023",
+       x = "Date",
+       y = "Number of A&E Breaches") +
+  scale_x_date(date_labels = "%Y", date_breaks = "1 year")+
+  annotate('rect', xmin = as.Date("2020-01-01"), xmax = as.Date("2021-12-31"), ymin = 0, ymax = 130000,
+           alpha = 0.1, fill = "blue", col = "black") +
+  annotate('text', x = as.Date("2018-08-01"), y = 130000, label = "COVID Period") + 
+# We use 'annotate' again and using the same syntax as the box we now define the arrow's curve and length
+   annotate('curve', x = as.Date("2018-10-01"), xend = as.Date("2019-12-01"),
+            y = 125000, yend = 110000, linewidth = 0.5, curvature = 0.5,
+             arrow = arrow(length = unit(0.4,'cm'))) +
+# Below is the code for adding the vertical lines, again using the axes to determine their positions
+  geom_segment(aes(x = as.Date("2020-03-01"), y = 0, yend = 150000,
+                     xend = as.Date("2020-03-01"), colour = "segment"),
+                     linewidth = 0.5, colour="green") +
+  geom_segment(aes(x = as.Date("2020-11-01"), y = 0, yend = 150000,
+                     xend = as.Date("2020-11-01"), colour = "segment"),
+                     linewidth = 0.5, colour="green") +
+  geom_segment(aes(x = as.Date("2021-01-01"), y = 0, yend = 150000,
+                     xend = as.Date("2021-01-01"), colour = "segment"),
+                     linewidth = 0.5, colour="green") +
+# Here we add labels to distinguish the lines
+  annotate('text',x = as.Date("2018-05-01"),y = 160000,label = "First lockdown") +
+    annotate('text',x = as.Date("2020-03-01"),y = 180000,label = "Second lockdown") +
+    annotate('text',x = as.Date("2021-09-01"),y = 165000,label = "Third lockdown") +
+# And now add the arrows to make it clear which is which
+   annotate('curve',x = as.Date("2019-01-01"),xend = as.Date("2020-03-01"), y = 155000, yend = 140000 ,
+    linewidth = 0.5,curvature = 0.6,arrow = arrow(length = unit(0.2,'cm'))) +
+     annotate('curve',x = as.Date("2020-02-01"),xend = as.Date("2020-11-01"), y = 175000, yend = 150000,
+    linewidth = 0.5,curvature = 0.6,arrow = arrow(length = unit(0.2,'cm'))) +
+   annotate('curve',x = as.Date("2021-10-01"),xend = as.Date("2021-01-01"), y = 155000 , yend = 140000,
+    linewidth = 0.5,curvature = 0.6,arrow = arrow(length = unit(0.2,'cm'))) +
+# We can start by adding a type of theme here, in this case 'light'
+  theme_light() +
+# Now we can add the legend and title details
+  theme(plot.title = element_text(size = 13, face = 'bold') ,
+        plot.subtitle = element_text(size = 11),
+        axis.title = element_text(size = 12, face = 'bold'),
+        axis.text.x = element_text(size = 10.5, angle = 90, vjust = 0.5, hjust = 1),
+        axis.text.y = element_text(size = 10.5),
+        legend.box.background = element_rect(colour = "black", linewidth = 1),
+        legend.box.just = c("right", "top"),
+        legend.text = element_text(size = 8))
+  
+
+Legend_Breaches_Plot
 ```
