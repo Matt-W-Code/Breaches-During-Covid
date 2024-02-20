@@ -122,7 +122,7 @@ Simple_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, y = `T
   labs(title = "Total A&E Admissions in England",
        subtitle = "For 2010-2023",
        x = "Date",
-       y = "Number of Breaches")
+       y = "Number of Admissions")
 Simple_Plot
 
 ```
@@ -139,7 +139,7 @@ Simple_Plot_Dates <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, 
   labs(title = "Total A&E Admissions in England",
        subtitle = "For 2010-2023",
        x = "Date",
-       y = "Total A&E Admissions") +
+       y = "Number of Admissions") +
 # We can simply add our scale onto the graph by including the 'scale_x_date' condition 
   scale_x_date(date_labels = "%Y", date_breaks = "1 year")
 
@@ -154,16 +154,17 @@ Now we know how to plot a line we swap out the Total Admissions for our 4 and 12
 Simple_Breaches_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Formatted`, y = `4 Hour Breaches`)) +
 # This first geom_line represents the 4 Hour line we detailed in the ggplot condition
   geom_line(colour = "red", size = 0.5) +
-# Then to add a second line we simpply add another geom_line condition and specify the variables
+# Then to add a second line we simply add another geom_line condition and specify the variables
   geom_line(aes(x = `Period Formatted`, y = `12 Hour Breaches`), colour = "purple", size = 0.5) +
   labs(title = "Total A&E Breaches in England",
        subtitle = "For 2010-2023",
        x = "Date",
-       y = "Number of Breaches") +
+       y = "Number of A&E Breaches") +
   scale_x_date(date_labels = "%Y", date_breaks = "1 year")
 
 Simple_Breaches_Plot
 ```
+
 ## Adding annotations
 
 We can now add some annotations to help visualise this plot better
@@ -183,7 +184,7 @@ Annotated_Breaches_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Format
   labs(title = "Total A&E Breaches in England",
        subtitle = "For 2010-2023",
        x = "Date",
-       y = "Number of Breaches") +
+       y = "Number of A&E Breaches") +
   scale_x_date(date_labels = "%Y", date_breaks = "1 year") +
 # The 'annotate' condition is used to place a rectangle on the graph, the x asis defines the width and the y defines the height
   annotate('rect', xmin = as.Date("2020-01-01"), xmax = as.Date("2021-12-31"), ymin = 0, ymax = 130000,
@@ -193,6 +194,7 @@ Annotated_Breaches_Plot <- ggplot(Monthly_Data_Formatted, aes(x = `Period Format
 
 Annotated_Breaches_Plot
 ```
+
 ## Adding an arrow 
 
 Lets add an arrow to the label to make it clearer
@@ -335,7 +337,7 @@ Themed_Breaches_Plot
 
 ## Adding a legend to the plot
 
-Now to clean up the legend and add some more details to the theme and we should have our final plot 
+Now to clean up the legend and add some more details to the theme and we will have a final plot 
 
 ``` {r adding legend}
 # Creating our colours object
